@@ -1,0 +1,84 @@
+from evaluate import evaluate_model
+from trainer import Trainer
+from data_preprocess import prepare_data
+from model import *
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms, models
+import time
+import copy
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import Type, Any, Callable, Union, List, Optional
+import os
+import argparse
+from tqdm import tqdm
+import seaborn as sns
+import random
+import json
+import logging
+import sys
+import warnings
+
+def parse_args(input_args = None):
+    parser = argparse.ArgumentParser(description="Example training script")
+    parser.add_argument('--data_dir', type=str, default='data', help='Path to the dataset directory')
+    parser.add_argument('--input_size', type=int, default=224, help='Input size for the model')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training and validation')
+    parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs to train')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for the optimizer')
+    parser.add_argument('--model_name', type = str, default = 'alexnet',
+                        choices = ['alexnet', 'vgg16', 'lenet', 'vgg16', 'vgg16_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101'],
+                        help = 'Name of the model to use')
+    parser.add_argument('--pretrained', action='store_true', help='Use pretrained model weights')
+    parser.add_argument('--save_path', type=str, default='best_model.pth', help='Path to save the best model')
+    parser.add_argument('--criterion', type=str, default='cross_entropy', choices=['cross_entropy', 'mse'], help='Loss function to use')
+    parser.add_argument('--optimizer', type=str, default='adamw', choices=['adamw', 'sgd'], help='Optimizer to use')
+    parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'step_lr', 'cosine'], help='Learning rate scheduler to use')
+    
+    args = parser.parse_args(input_args)
+    return args
+
+def main(args):
+    random.seed(42)
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print(f"Using device: {device}")
+    dataloaders, dataset_sizes, class_names, num_classes = prepare_data(args.data_dir, args.input_size, args.batch_size)
+    print(f"Dataset sizes: {dataset_sizes}")
+    print(f"Class names: {class_names}")
+    
+    if args.model_name == 'alexnet':
+        model = AlexNet(num_classes=num_classes)
+    elif args.model_name == 'lenet':
+        model = LeNet(num_classes=num_classes, in_channels=3)
+    elif args.model_name == 'vgg16':
+        model = VGG16(num_classes = num_classes, in_channels = 3, dropout_rate= 0.4, input_size=args.input_size)
+    elif args.model_name == 'vgg16_bn':
+        model = VGG16BatchNorm(num_classes= num_classes, in_channels = 3, dropout_rate= 0.4, input_size=args.input_size)
+    elif args.model_name == 'resnet18':
+        model = resnet18(num_classes = num_classes, in_channels= 3)
+    elif args.model_name == 'resnet34':
+        model = resnet34(num_classes = num_classes, in_channels= 3)
+    elif args.model_name == 'resnet50':
+        model = resnet50(num_classes= num_classes, in_channels= 3)
+    elif args.model_name == 'resnet101':
+        model = resnet101(num_classes= num_classes, in_channels= 3)
+    else:
+        raise ValueError(f"Model {args.model_name} not recognized.")
+    print(f"Model: {model}")
+    
+    trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=args.criterion, optimizer=args.optimizer, scheduler=args.scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
+    trainer.train()
+    trainer.plot_history()
+    
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
