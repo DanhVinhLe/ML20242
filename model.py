@@ -9,7 +9,7 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Type, Any, Callable, Union, List, Optional
-
+from collections import namedtuple
 #Lenet Model
 class LeNet(nn.Module):
     def __init__(self, num_classes = 10, in_channels = 1):
@@ -422,3 +422,376 @@ def resnet101(num_classes: int = 1000, in_channels: int = 3) -> ResNet:
         in_channels (int): Number of input channels.
     """
     return ResNet(BottleNeck, [3, 4, 23, 3], num_classes=num_classes, in_channels=in_channels)
+
+# Inception V1 model
+
+class InceptionBlock(nn.Module):
+    def __init__(self, in_channels, out1x1, out3x3_reduce, out3x3, out5x5_reduce, out5x5, pool_proj):
+        super(InceptionBlock, self).__init__()
+        
+        # 1x1 Convolution
+        self.branch1x1 = nn.Sequential(
+            nn.Conv2d(in_channels, out1x1, kernel_size=1),
+            nn.BatchNorm2d(out1x1),
+            nn.ReLU(inplace=True)
+        )
+        
+        # 1x1 Convolution followed by 3x3 Convolution
+        self.branch3x3 = nn.Sequential(
+            nn.Conv2d(in_channels, out3x3_reduce, kernel_size=1),
+            nn.BatchNorm2d(out3x3_reduce),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out3x3_reduce, out3x3, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out3x3),
+            nn.ReLU(inplace=True)
+        )
+        
+        # 1x1 Convolution followed by 5x5 Convolution
+        self.branch5x5 = nn.Sequential(
+            nn.Conv2d(in_channels, out5x5_reduce, kernel_size=1),
+            nn.BatchNorm2d(out5x5_reduce),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out5x5_reduce, out5x5, kernel_size=5, padding=2),
+            nn.BatchNorm2d(out5x5),
+            nn.ReLU(inplace=True)
+        )
+        
+        # 3x3 Max Pooling followed by 1x1 Convolution
+        self.branch_pool = nn.Sequential(
+            nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels, pool_proj, kernel_size=1),
+            nn.BatchNorm2d(pool_proj),
+            nn.ReLU(inplace=True)
+        )
+        
+    def forward(self, x):
+        branch1 = self.branch1x1(x)
+        branch2 = self.branch3x3(x)
+        branch3 = self.branch5x5(x)
+        branch4 = self.branch_pool(x)
+        
+        outputs = [branch1, branch2, branch3, branch4]
+        return torch.cat(outputs, 1)
+    
+class InceptionV1(nn.Module):
+    def __init__(self, num_classes = 1000, in_channels = 3):
+        super(InceptionV1, self).__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(self.in_channels, 64, kernel_size=7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+        )
+        self.maxpool1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(64, 64, kernel_size=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.BatchNorm2d(192),
+            nn.ReLU(inplace=True),
+        )
+        self.maxpool2 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.inception3a = InceptionBlock(192, 64, 96, 128, 16, 32, 32)
+        self.inception3b = InceptionBlock(256, 128, 128, 192, 32, 96, 64)
+        self.maxpool3 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.inception4a = InceptionBlock(480, 192, 96, 208, 16, 48, 64)
+        self.inception4b = InceptionBlock(512, 160, 112, 224, 24, 64, 64)
+        self.inception4c = InceptionBlock(512, 128, 128, 256, 24, 64, 64)
+        self.inception4d = InceptionBlock(512, 112, 144, 288, 32, 64, 64)
+        self.inception4e = InceptionBlock(528, 256, 160, 320, 32, 128, 128)
+        
+        self.maxpool4 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.inception5a = InceptionBlock(832, 256, 160, 320, 32, 128, 128)
+        self.inception5b = InceptionBlock(832, 384, 192, 384, 48, 128, 128)
+        self.avgpool = nn.AvgPool2d(kernel_size=7, stride=1)
+        self.dropout = nn.Dropout(p=0.4)
+        self.fc = nn.Linear(1024, self.num_classes)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.maxpool2(x)
+        x = self.inception3a(x)
+        x = self.inception3b(x)
+        x = self.maxpool3(x)
+        x = self.inception4a(x)
+        x = self.inception4b(x)
+        x = self.inception4c(x)
+        x = self.inception4d(x)
+        x = self.inception4e(x)
+        x = self.maxpool4(x)
+        x = self.inception5a(x)
+        x = self.inception5b(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x)
+        x = self.fc(x)
+        
+        return x
+    
+
+# Inception V3 model
+class BasicConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0):
+        super(BasicConv2d, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        self.bn = nn.BatchNorm2d(out_channels, eps = 0.001)
+        self.relu = nn.ReLU(inplace=True)
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
+
+class InceptionA(nn.Module):
+    def __init__(self, in_channels, pool_features):
+        super(InceptionA, self).__init__()
+        self.branch1x1 = BasicConv2d(in_channels, 64, kernel_size=1)
+        self.branch3x3_1 = BasicConv2d(in_channels, 48, kernel_size=1)
+        self.branch3x3_2 = BasicConv2d(48, 64, kernel_size=3, padding = 1)
+        
+        self.branch3x3dbl_1 = BasicConv2d(in_channels, 64, kernel_size=1)
+        self.branch3x3dbl_2 = BasicConv2d(64, 96, kernel_size=3, padding = 1)
+        self.branch3x3dbl_3 = BasicConv2d(96, 96, kernel_size=3, padding = 1)
+        
+        self.branch_pool = BasicConv2d(in_channels, pool_features, kernel_size=1)
+        self.pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        
+    def forward(self, x):
+        branch1 = self.branch1x1(x)
+        
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = self.branch3x3_2(branch3x3)
+        
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = self.branch3x3dbl_3(branch3x3dbl)
+        
+        branch_pool = self.pool(x)
+        branch_pool = self.branch_pool(branch_pool)
+        
+        outputs = [branch3x3dbl, branch3x3, branch_pool, branch1]
+        return torch.cat(outputs, 1)
+    
+class InceptionB(nn.Module):
+    # Incetion B block reduce dimensionality
+    def __init__(self, in_channels):
+        super(InceptionB, self).__init__()
+        self.branch1x1 = BasicConv2d(in_channels, 384, kernel_size=3, stride = 2)
+        self.branch3x3_1 = BasicConv2d(in_channels, 64, kernel_size=1)
+        self.branch3x3_2 = BasicConv2d(64, 96, kernel_size= 3, padding = 1)
+        self.branch3x3_3 = BasicConv2d(96, 96, kernel_size=3, stride= 2)
+        self.branch_pool = nn.MaxPool2d(kernel_size=3, stride=2)
+        
+    def forward(self, x):
+        branch1 = self.branch1x1(x)
+        
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = self.branch3x3_2(branch3x3)
+        branch3x3 = self.branch3x3_3(branch3x3)
+        
+        branch_pool = self.branch_pool(x)
+        
+        outputs = [branch3x3, branch1, branch_pool]
+        return torch.cat(outputs, 1)
+    
+class InceptionC(nn.Module):
+    def __init__(self, in_channels, channel_7):
+        super(InceptionC, self).__init__()
+        self.branch1x1 = BasicConv2d(in_channels, 192, kernel_size=1)
+        c7 = channel_7
+        
+        self.branch7x7_1 = BasicConv2d(in_channels, c7, kernel_size=1)
+        self.branch7x7_2 = BasicConv2d(c7, c7, kernel_size=(1, 7), padding=(0, 3))
+        self.branch7x7_3 = BasicConv2d(c7, 192, kernel_size=(7, 1), padding=(3, 0))
+        
+        self.branch7x7db_1 = BasicConv2d(in_channels, c7, kernel_size=1)
+        self.branch7x7db_2 = BasicConv2d(c7, c7, kernel_size=(7, 1), padding=(3, 0))
+        self.branch7x7db_3 = BasicConv2d(c7, c7, kernel_size=(1, 7), padding=(0, 3))
+        self.branch7x7db_4 = BasicConv2d(c7, c7, kernel_size=(7, 1), padding=(3, 0))
+        self.branch7x7db_5 = BasicConv2d(c7, 192, kernel_size=(1, 7), padding=(0, 3))
+        
+        self.branch_pool = BasicConv2d(in_channels, 192, kernel_size=1)
+        
+    def forward(self, x):
+        branch1 = self.branch1x1(x)
+        
+        branch7x7 = self.branch7x7_1(x)
+        branch7x7 = self.branch7x7_2(branch7x7)
+        branch7x7 = self.branch7x7_3(branch7x7)
+        
+        branch7x7dbl = self.branch7x7db_1(x)
+        branch7x7dbl = self.branch7x7db_2(branch7x7dbl)
+        branch7x7dbl = self.branch7x7db_3(branch7x7dbl)
+        branch7x7dbl = self.branch7x7db_4(branch7x7dbl)
+        branch7x7dbl = self.branch7x7db_5(branch7x7dbl)
+        
+        branch_pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)(x)
+        branch_pool = self.branch_pool(branch_pool)
+        
+        outputs = [branch7x7dbl, branch7x7, branch_pool, branch1]
+        return torch.cat(outputs, 1)
+    
+class InceptionD(nn.Module):
+    # Inception D block reduce dimensionality
+    def __init__(self, in_channels):
+        super(InceptionD, self).__init__()
+        self.branch7x7_1 = BasicConv2d(in_channels, 192, kernel_size = 1)
+        self.branch7x7_2 = BasicConv2d(192, 192, kernel_size=(1, 7), padding=(0, 3))
+        self.branch7x7_3 = BasicConv2d(192, 192, kernel_size=(7, 1), padding=(3, 0))
+        self.branch7x7_4 = BasicConv2d(192, 192, kernel_size=3, stride=2)
+        
+        self.branch3x3_1 = BasicConv2d(in_channels, 192, kernel_size=1)
+        self.branch3x3_2 = BasicConv2d(192, 320, kernel_size=3, stride=2)
+        self.branch_pool = nn.MaxPool2d(kernel_size=3, stride=2)
+        
+    def forward(self, x):
+        branch7x7 = self.branch7x7_1(x)
+        branch7x7 = self.branch7x7_2(branch7x7)
+        branch7x7 = self.branch7x7_3(branch7x7)
+        branch7x7 = self.branch7x7_4(branch7x7)
+        
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = self.branch3x3_2(branch3x3)
+        
+        branch_pool = self.branch_pool(x)
+        
+        outputs = [branch3x3, branch7x7, branch_pool]
+        return torch.cat(outputs, 1)
+    
+class InceptionE(nn.Module):
+    def __init__(self, in_channels):
+        super(InceptionE, self).__init__()
+        self.branch3x3l_1 = BasicConv2d(in_channels, 448, kernel_size=1)
+        self.branch3x3l_2 = BasicConv2d(448, 384, kernel_size = 3, padding =1)
+        self.branch3x3l_3a = BasicConv2d(384, 384, kernel_size=(1, 3), padding=(0, 1))
+        self.branch3x3l_3b = BasicConv2d(384, 384, kernel_size=(3, 1), padding=(1, 0))
+        
+        self.branch3x3r_1 = BasicConv2d(in_channels, 384, kernel_size=1)
+        self.branch3x3r_2a = BasicConv2d(384, 384, kernel_size=(1, 3), padding=(0, 1))
+        self.branch3x3r_2b = BasicConv2d(384, 384, kernel_size=(3, 1), padding=(1, 0))
+        
+        self.branch_pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        self.branch_pool_conv = BasicConv2d(in_channels, 192, kernel_size=1)
+        
+        self.branch1x1 = BasicConv2d(in_channels, 320, kernel_size=1)
+        
+    def forward(self, x):
+        branch3x3l = self.branch3x3l_1(x)
+        branch3x3l = self.branch3x3l_2(branch3x3l)
+        branch3x3l_3a = self.branch3x3l_3a(branch3x3l)
+        branch3x3l_3b = self.branch3x3l_3b(branch3x3l)
+        branch3x3l = torch.cat([branch3x3l_3a, branch3x3l_3b], 1)
+        
+        branch3x3r = self.branch3x3r_1(x)
+        branch3x3r_2a = self.branch3x3r_2a(branch3x3r)
+        branch3x3r_2b = self.branch3x3r_2b(branch3x3r)
+        branch3x3r = torch.cat([branch3x3r_2a, branch3x3r_2b], 1)
+        
+        branch_pool = self.branch_pool(x)
+        branch_pool = self.branch_pool_conv(branch_pool)
+        
+        branch1x1 = self.branch1x1(x)
+        outputs = [branch3x3l, branch3x3r, branch_pool, branch1x1]
+        return torch.cat(outputs, 1)
+    
+class AuxiliaryClassifier(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super(AuxiliaryClassifier, self).__init__()
+        self.pool1 = nn.AvgPool2d(kernel_size=5, stride=3)
+        self.conv0 = BasicConv2d(in_channels, 128, kernel_size=1)
+        self.conv1 = BasicConv2d(128, 768, kernel_size=5)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(768, num_classes)
+        
+    def forward(self, x):
+        x = self.pool1(x)
+        x = self.conv0(x)
+        x = self.conv1(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        return x
+
+InceptionOutput = namedtuple('InceptionOutput', ['logits', 'aux_logits'])
+
+class InceptionV3(nn.Module):
+    def __init__(self, num_classes = 1000, in_channels = 3, aux_logits = True):
+        super().__init__()
+        self.aux_logits = aux_logits
+        self.num_classes = num_classes
+        self.in_channels = in_channels
+        
+        self.conv1_3x3 = BasicConv2d(self.in_channels, 32, kernel_size=3, stride=2)
+        self.conv2a_3x3 = BasicConv2d(32, 32, kernel_size=3)
+        self.conv2b_3x3 = BasicConv2d(32, 64, kernel_size=3, padding = 1)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=3, stride=2)
+        
+        self.conv3a_3x3 = BasicConv2d(64, 80, kernel_size=1)
+        self.conv3b_3x3 = BasicConv2d(80, 192, kernel_size=3)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=3, stride=2)
+        
+        self.mixed_5a = InceptionA(in_channels=192, pool_features=32)
+        self.mixed_5b = InceptionA(in_channels=256, pool_features=64)
+        self.mixed_5c = InceptionA(in_channels=288, pool_features=64)
+        
+        self.mixed_6a = InceptionB(in_channels=288)
+        self.mixed_6b = InceptionC(in_channels=768, channel_7=128)
+        self.mixed_6c = InceptionC(in_channels=768, channel_7=160)
+        self.mixed_6d = InceptionC(in_channels=768, channel_7=160)
+        self.mixed_6e = InceptionC(in_channels=768, channel_7=192)
+        
+        if self.aux_logits:
+            self.aux_classifier = AuxiliaryClassifier(in_channels=768, num_classes=self.num_classes)
+            
+        self.mixed_7a = InceptionD(in_channels=768)
+        self.mixed_7b = InceptionE(in_channels=1280)
+        self.mixed_7c = InceptionE(in_channels=2048)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(p=0.4)
+        self.fc = nn.Linear(2048, self.num_classes)
+        
+    def forward(self, x):
+        x = self.conv1_3x3(x)
+        x = self.conv2a_3x3(x)
+        x = self.conv2b_3x3(x)
+        x = self.maxpool1(x)
+        print(x.shape)
+        
+        x = self.conv3a_3x3(x)
+        x = self.conv3b_3x3(x)
+        x = self.maxpool2(x)
+        print(x.shape)
+        
+        x = self.mixed_5a(x)
+        x = self.mixed_5b(x)
+        x = self.mixed_5c(x)
+        print(x.shape)
+        
+        x = self.mixed_6a(x)
+        x = self.mixed_6b(x)
+        x = self.mixed_6c(x)
+        x = self.mixed_6d(x)
+        x = self.mixed_6e(x)
+        print(x.shape)
+        
+        if self.aux_logits:
+            aux = self.aux_classifier(x)
+        
+        x = self.mixed_7a(x)
+        x = self.mixed_7b(x)
+        x = self.mixed_7c(x)
+        print(x.shape)
+        
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x)
+        x = self.fc(x)
+        if self.training and self.aux_logits:
+            return InceptionOutput(x, aux)
+        return x 
+        
