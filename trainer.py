@@ -84,19 +84,18 @@ class Trainer:
                         self.history['val_loss'].append(epoch_loss)
                         self.history['val_acc'].append(epoch_acc.item())
                     
-                    print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
-                    
-                    if phase == 'val':
-                        if epoch_acc > self.best_acc:
-                            self.best_acc = epoch_acc
-                            self.best_model = copy.deepcopy(self.model.state_dict())
-                            
-                            
-                        if epoch_loss < self.best_val_loss:
-                            self.best_val_loss = epoch_loss
-                            if self.save_path:
-                                torch.save(self.model.state_dict(), self.save_path)
-                                print(f"Model saved to {self.save_path}")
+                if phase == 'val':
+                    if epoch_acc > self.best_acc:
+                        self.best_acc = epoch_acc
+                        self.best_model = copy.deepcopy(self.model.state_dict())
+                        
+                    if epoch_loss < self.best_val_loss:
+                        self.best_val_loss = epoch_loss
+                        if self.save_path:
+                            torch.save(self.model.state_dict(), self.save_path)
+                            print(f"Model saved to {self.save_path}")
+                print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+                
                         
             epoch_end = time.time()
             print(f'Epoch {epoch+1} completed in {epoch_end - epoch_start:.0f} seconds')
