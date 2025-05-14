@@ -22,6 +22,7 @@ import json
 import logging
 import sys
 import warnings
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR, LambdaLR
 
 def parse_args(input_args = None):
     parser = argparse.ArgumentParser(description="Example training script")
@@ -36,8 +37,9 @@ def parse_args(input_args = None):
     parser.add_argument('--pretrained', action='store_true', help='Use pretrained model weights')
     parser.add_argument('--save_path', type=str, default='best_model.pth', help='Path to save the best model')
     parser.add_argument('--criterion', type=str, default='cross_entropy', choices=['cross_entropy', 'mse'], help='Loss function to use')
-    parser.add_argument('--optimizer', type=str, default='adamw', choices=['adamw', 'sgd'], help='Optimizer to use')
-    parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'step_lr', 'cosine'], help='Learning rate scheduler to use')
+    parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'adamw', 'sgd'], help='Optimizer to use')
+    parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'linear', 'cosine'], help='Learning rate scheduler to use')
+    parser.add_argument('--num_warmup_steps', type=int, default=0, help='Number of warmup steps for the scheduler')
     parser.add_argument('--model_type', type = str, default = 'large', choices = ['large;, small'], help = 'Model type of MobileNetV3')
     parser.add_argument('--dropout_rate', type = float, default = 0.4, help = 'Dropout rate for model')
     args = parser.parse_args(input_args)
@@ -81,8 +83,26 @@ def main(args):
     else:
         raise ValueError(f"Model {args.model_name} not recognized.")
     print(f"Model: {model}")
+    if args.optimizer == 'adamw':
+        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+    elif args.optimizer == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
+    elif args.optimizer == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    else:
+        raise ValueError(f"Optimizer {args.optimizer} not recognized.")
     
-    trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=args.criterion, optimizer=args.optimizer, scheduler=args.scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
+    if args.criterion == 'cross_entropy':
+        criterion = nn.CrossEntropyLoss()
+    if args.scheduler == 'constant':
+        scheduler = None
+    elif args.scheduler == 'linear':
+        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=args.num_warmup_steps)
+    elif args.scheduler == 'cosine':
+        scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs, eta_min=0)
+        
+    
+    trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=criterion, optimizer=optimizer, scheduler=scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
     trainer.train()
     trainer.plot_history()
     

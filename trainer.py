@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
+
 class Trainer:
     def __init__(self, model, dataloaders, dataset_sizes, criterion, optimizer, scheduler = None, 
                  device = None, num_epochs = 25, save_path = None):
