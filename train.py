@@ -80,7 +80,7 @@ def main(args):
     elif args.model_name == 'mobilenetv3':
         model = MobileNetV3(model = args.model_type, num_classes = num_classes, dropout=args.dropout_rate)
     elif args.model_name == 'vit':
-        model = VisionTransformer(num_classes = args.num_classes, dropout_rate= args.dropout_rate)
+        model = VisionTransformer(num_classes = num_classes, dropout_rate= args.dropout_rate)
     else:
         raise ValueError(f"Model {args.model_name} not recognized.")
     print(f"Model: {model}")
