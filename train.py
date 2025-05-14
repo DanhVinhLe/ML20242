@@ -41,7 +41,7 @@ def parse_args(input_args = None):
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'adamw', 'sgd'], help='Optimizer to use')
     parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'linear', 'cosine'], help='Learning rate scheduler to use')
     parser.add_argument('--num_warmup_steps', type=int, default=0, help='Number of warmup steps for the scheduler')
-    parser.add_argument('--model_type', type = str, default = 'large', choices = ['large;, small'], help = 'Model type of MobileNetV3')
+    parser.add_argument('--model_type', type = str, default = 'large', choices = ['large', 'small'], help = 'Model type of MobileNetV3')
     parser.add_argument('--dropout_rate', type = float, default = 0.4, help = 'Dropout rate for model')
     args = parser.parse_args(input_args)
     return args
