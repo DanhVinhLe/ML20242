@@ -15,7 +15,6 @@ class Trainer:
     def __init__(self, model, dataloaders, dataset_sizes, criterion, optimizer, scheduler = None, 
                  device = None, num_epochs = 25, save_path = None):
         super().__init__()
-        self.model = model 
         self.dataloaders = dataloaders
         self.dataset_sizes = dataset_sizes
         self.criterion = criterion
@@ -33,6 +32,7 @@ class Trainer:
             'train_acc': [],
             'val_acc': []
         }
+        self.model = model.to(self.device)
     
     def train(self):
         since = time.time()
