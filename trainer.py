@@ -40,7 +40,7 @@ class Trainer:
             print(f'Epoch {epoch+1}/{self.num_epochs}')
             print('-' * 10)
             epoch_start = time.time()
-            for phase in ['train', 'valid']:
+            for phase in ['train', 'test']:
                 if phase == 'train':
                     self.model.train()
                 else:
@@ -85,7 +85,7 @@ class Trainer:
                     self.history['val_loss'].append(epoch_loss)
                     self.history['val_acc'].append(epoch_acc.item())
                     
-                if phase == 'valid':
+                if phase == 'test':
                     if epoch_acc > self.best_acc:
                         self.best_acc = epoch_acc
                         self.best_model = copy.deepcopy(self.model.state_dict())
@@ -103,8 +103,8 @@ class Trainer:
             
         time_elapsed = time.time() - since
         print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
-        print(f'Best val Acc: {self.best_acc:.4f}')
-        print(f'Best val Loss: {self.best_val_loss:.4f}')
+        print(f'Best test Acc: {self.best_acc:.4f}')
+        print(f'Best test Loss: {self.best_val_loss:.4f}')
         
         self.model.load_state_dict(self.best_model)
         return self.model, self.history
