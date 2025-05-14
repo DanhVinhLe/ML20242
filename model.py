@@ -724,7 +724,7 @@ class AuxiliaryClassifier(nn.Module):
 InceptionOutput = namedtuple('InceptionOutput', ['logits', 'aux_logits'])
 
 class InceptionV3(nn.Module):
-    def __init__(self, num_classes = 1000, in_channels = 3, aux_logits = True):
+    def __init__(self, num_classes = 1000, in_channels = 3, aux_logits = False):
         super().__init__()
         self.aux_logits = aux_logits
         self.num_classes = num_classes
@@ -765,24 +765,24 @@ class InceptionV3(nn.Module):
         x = self.conv2a_3x3(x)
         x = self.conv2b_3x3(x)
         x = self.maxpool1(x)
-        print(x.shape)
+        # print(x.shape)
         
         x = self.conv3a_3x3(x)
         x = self.conv3b_3x3(x)
         x = self.maxpool2(x)
-        print(x.shape)
+        # print(x.shape)
         
         x = self.mixed_5a(x)
         x = self.mixed_5b(x)
         x = self.mixed_5c(x)
-        print(x.shape)
+        # print(x.shape)
         
         x = self.mixed_6a(x)
         x = self.mixed_6b(x)
         x = self.mixed_6c(x)
         x = self.mixed_6d(x)
         x = self.mixed_6e(x)
-        print(x.shape)
+        # print(x.shape)
         
         if self.aux_logits:
             aux = self.aux_classifier(x)
@@ -790,7 +790,7 @@ class InceptionV3(nn.Module):
         x = self.mixed_7a(x)
         x = self.mixed_7b(x)
         x = self.mixed_7c(x)
-        print(x.shape)
+        # print(x.shape)
         
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
