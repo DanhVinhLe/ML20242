@@ -106,7 +106,7 @@ def main(args):
     trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=criterion, optimizer=optimizer, scheduler=scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
     model, history = trainer.train()
     trainer.plot_history()
-    evaluate_model(model, dataloaders['test'], num_class = num_classes)
+    evaluate_model(model, dataloaders['test'], num_class = num_classes, batch_size= args.batch_size)
 if __name__ == "__main__":
     args = parse_args()
     main(args)
