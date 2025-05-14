@@ -23,6 +23,7 @@ import logging
 import sys
 import warnings
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR, LambdaLR
+from evaluate import evaluate_model
 
 def parse_args(input_args = None):
     parser = argparse.ArgumentParser(description="Example training script")
@@ -103,9 +104,9 @@ def main(args):
         
     
     trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=criterion, optimizer=optimizer, scheduler=scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
-    trainer.train()
+    model, history = trainer.train()
     trainer.plot_history()
-    
+    evaluate_model(model, dataloaders['test'], num_class = num_classes)
 if __name__ == "__main__":
     args = parse_args()
     main(args)

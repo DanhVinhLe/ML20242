@@ -50,6 +50,7 @@ class Trainer:
                 running_corrects = 0
                 dataloader = self.dataloaders[phase]
                 progress_bar = tqdm(dataloader, desc=f"{phase} epoch {epoch+1}/{self.num_epochs}", unit="batch")
+                seen_samples = 0
                 for inputs, labels in progress_bar:
                     inputs = inputs.to(self.device)
                     labels = labels.to(self.device)
@@ -67,8 +68,8 @@ class Trainer:
                         
                         running_loss += loss.item() * inputs.size(0)
                         running_corrects += torch.sum(preds == labels.data)
-
-                        current_loss = running_loss / ((progress_bar.n + 1) * inputs.size(0))
+                        seen_samples += inputs.size(0)
+                        current_loss = running_loss / seen_samples
                         progress_bar.set_postfix(loss = f"{current_loss:.4f}")
                     
                 if phase == 'train' and self.scheduler is not None:
