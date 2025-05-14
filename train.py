@@ -78,7 +78,7 @@ def main(args):
     elif args.model_name == 'inceptionv3':
         model = InceptionV3(num_classes=num_classes, in_channels=3)
     elif args.model_name == 'mobilenetv3':
-        model = MobileNetV3(model = args.model_type, num_classes = num_classes, dropout=args.dropout_rate)
+        model = MobileNetV3(mode = args.model_type, num_classes = num_classes, dropout=args.dropout_rate)
     elif args.model_name == 'vit':
         model = VisionTransformer(num_classes = num_classes, dropout_rate= args.dropout_rate)
     else:
