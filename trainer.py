@@ -40,7 +40,7 @@ class Trainer:
             print(f'Epoch {epoch+1}/{self.num_epochs}')
             print('-' * 10)
             epoch_start = time.time()
-            for phase in ['train', 'val']:
+            for phase in ['train', 'valid']:
                 if phase == 'train':
                     self.model.train()
                 else:
@@ -71,20 +71,20 @@ class Trainer:
                         current_loss = running_loss / ((progress_bar.n + 1) * inputs.size(0))
                         progress_bar.set_postfix(loss = f"{current_loss:.4f}")
                     
-                    if phase == 'train' and self.scheduler is not None:
-                        self.scheduler.step()
-                        
-                    epoch_loss = running_loss / self.dataset_sizes[phase]
-                    epoch_acc = running_corrects.double() / self.dataset_sizes[phase]
+                if phase == 'train' and self.scheduler is not None:
+                    self.scheduler.step()
                     
-                    if phase == 'train':
-                        self.history['train_loss'].append(epoch_loss)
-                        self.history['train_acc'].append(epoch_acc.item())
-                    else:
-                        self.history['val_loss'].append(epoch_loss)
-                        self.history['val_acc'].append(epoch_acc.item())
+                epoch_loss = running_loss / self.dataset_sizes[phase]
+                epoch_acc = running_corrects.double() / self.dataset_sizes[phase]
+                
+                if phase == 'train':
+                    self.history['train_loss'].append(epoch_loss)
+                    self.history['train_acc'].append(epoch_acc.item())
+                else:
+                    self.history['val_loss'].append(epoch_loss)
+                    self.history['val_acc'].append(epoch_acc.item())
                     
-                if phase == 'val':
+                if phase == 'valid':
                     if epoch_acc > self.best_acc:
                         self.best_acc = epoch_acc
                         self.best_model = copy.deepcopy(self.model.state_dict())
