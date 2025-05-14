@@ -31,14 +31,15 @@ def parse_args(input_args = None):
     parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs to train')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for the optimizer')
     parser.add_argument('--model_name', type = str, default = 'alexnet',
-                        choices = ['alexnet', 'vgg16', 'lenet', 'vgg16', 'vgg16_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101'],
+                        choices = ['alexnet', 'vgg16', 'lenet', 'vgg16', 'vgg16_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'inceptionv3', 'mobilenetv3', 'vit'],
                         help = 'Name of the model to use')
     parser.add_argument('--pretrained', action='store_true', help='Use pretrained model weights')
     parser.add_argument('--save_path', type=str, default='best_model.pth', help='Path to save the best model')
     parser.add_argument('--criterion', type=str, default='cross_entropy', choices=['cross_entropy', 'mse'], help='Loss function to use')
     parser.add_argument('--optimizer', type=str, default='adamw', choices=['adamw', 'sgd'], help='Optimizer to use')
     parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'step_lr', 'cosine'], help='Learning rate scheduler to use')
-    
+    parser.add_argument('--model_type', type = str, default = 'large', choices = ['large;, small'], help = 'Model type of MobileNetV3')
+    parser.add_argument('--dropout_rate', type = float, default = 0.4, help = 'Dropout rate for model')
     args = parser.parse_args(input_args)
     return args
 
@@ -71,6 +72,12 @@ def main(args):
         model = resnet50(num_classes= num_classes, in_channels= 3)
     elif args.model_name == 'resnet101':
         model = resnet101(num_classes= num_classes, in_channels= 3)
+    elif args.model_name == 'inceptionv3':
+        model = InceptionV3(num_classes=num_classes, in_channels=3)
+    elif args.model_name == 'mobilenetv3':
+        model = MobileNetV3(model = args.model_type, num_classes = num_classes, dropout=args.dropout_rate)
+    elif args.model_name == 'vit':
+        model = VisionTransformer(num_classes = args.num_classes, dropout_rate= args.dropout_rate)
     else:
         raise ValueError(f"Model {args.model_name} not recognized.")
     print(f"Model: {model}")

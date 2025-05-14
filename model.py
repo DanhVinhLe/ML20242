@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Type, Any, Callable, Union, List, Optional
 from collections import namedtuple
+import einops
+from einops.layers.torch import Rearrange
+
+
 #Lenet Model
 class LeNet(nn.Module):
     def __init__(self, num_classes = 10, in_channels = 1):
@@ -795,3 +799,259 @@ class InceptionV3(nn.Module):
             return InceptionOutput(x, aux)
         return x 
         
+# Vision Transformer (ViT) model
+class TransformerBlock(nn.Module):
+    def __init__(self, emb_dim, num_heads, ratio_dim, dropout_rate):
+        super(TransformerBlock, self).__init__()
+        self.attention = nn.MultiheadAttention(embed_dim=emb_dim, num_heads=num_heads)
+        self.norm1 = nn.LayerNorm(emb_dim)
+        self.norm2 = nn.LayerNorm(emb_dim)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.MLP = nn.Sequential(
+            nn.Linear(emb_dim, ratio_dim * emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(ratio_dim * emb_dim, emb_dim),
+        )
+
+    def forward(self, x):
+        norm_out = self.norm1(x)
+        attn_out, _ = self.attention(norm_out, norm_out, norm_out)
+        x = x + self.dropout1(attn_out)
+        norm_out = self.norm2(x)
+        x = x + self.MLP(norm_out)
+        
+        return x
+class VisionTransformer(nn.Module):
+    def __init__(self, num_classes=1000, in_channels=3, img_size=224, patch_size=16, 
+                 emb_dim=768, num_layers=12, num_heads=12, ratio_dim = 4, dropout_rate=0.1):
+        super(VisionTransformer, self).__init__()
+        self.num_classes = num_classes
+        self.in_channels = in_channels
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.ratio_dim = ratio_dim
+        self.emb_dim = emb_dim
+        self.dropout_rate = dropout_rate
+        
+        # Patch Embedding
+        num_patches = (img_size // patch_size) ** 2
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size),
+            nn.Linear(patch_size * patch_size * in_channels, emb_dim)
+        )
+        
+        # Positional Encoding
+        self.position_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, emb_dim))
+        
+        # Transformer Encoder Layers
+        self.transformer_layers = nn.ModuleList([
+            TransformerBlock(emb_dim, num_heads, ratio_dim, dropout_rate) for _ in range(num_layers)
+        ])
+        self.layernorm = nn.LayerNorm(emb_dim)
+        # Classification Head
+        self.fc_out = nn.Linear(self.emb_dim, num_classes)
+    
+    def forward(self, x):
+        # Patch Embedding
+        batch = x.shape[0]
+        x = self.patch_embedding(x)
+        cls_tokens = self.cls_token.expand(batch, -1, -1)
+        x = torch.cat((cls_tokens, x), dim = 1)
+        x += self.position_embedding
+        x = nn.Dropout(self.dropout_rate)(x)
+        
+        for layer in self.transformer_layers:
+            x = layer(x)
+            
+        x = self.layernorm(x)
+        cls_token_final = x[:, 0]
+        output = self.fc_out(cls_token_final)
+        return output
+
+# Implementation of MobileNetV3
+
+class HardSwish(nn.Module):
+    def __init__(self, inplace = True):
+        super(HardSwish, self).__init__()
+        self.inplace = inplace
+    def forward(self, x):
+        
+        return x * F.relu6(x + 3, inplace=self.inplace) / 6
+
+class SqueezeExcitation(nn.Module):
+    def __init__(self, in_channels, reduction_ratio = 4):
+        super(SqueezeExcitation, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc1 = nn.Conv2d(in_channels, in_channels // reduction_ratio, kernel_size=1)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Conv2d(in_channels // reduction_ratio, in_channels, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
+    
+    def forward(self, x):
+        module_inp = x
+        x = self.avg_pool(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return module_inp* x
+
+
+class InvertedResidual(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, expand_ratio, se_ratio, activation):
+        """
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+            kernel_size (int): Size of the convolution kernel.
+            stride (int): Stride of the convolution.
+            expand_ratio (int): Expansion ratio for the depthwise separable convolution.
+            se_ratio (float): Squeeze-and-excitation ratio.
+            activation (str): Activation function to use ('relu' or 'hard_swish').
+        """
+        super(InvertedResidual, self).__init__()
+        self.stride = stride
+        self.use_res_connect = self.stride == 1 and in_channels == out_channels
+        if activation == 'relu':
+            self.activation = nn.ReLU(inplace=True)
+        else:
+            self.activation = HardSwish(inplace=True)
+
+        hidden_dim = int(round(in_channels * expand_ratio))
+        layers = []
+        
+        if expand_ratio != 1:
+            layers.extend([
+                nn.Conv2d(in_channels, hidden_dim, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                self.activation,
+            ])
+        
+        layers.extend([
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, stride = stride, padding = kernel_size //2, groups = hidden_dim, bias= False),
+            nn.BatchNorm2d(hidden_dim),
+            self.activation,
+        ])
+        
+        if se_ratio is not None:
+            layers.append(SqueezeExcitation(hidden_dim, se_ratio))
+            
+        layers.extend([
+            nn.Conv2d(hidden_dim, out_channels, kernel_size=1, stride = 1, padding = 0, bias = False),
+            nn.BatchNorm2d(out_channels)
+        ])
+        
+        self.conv = nn.Sequential(*layers)
+        
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+        
+class MobileNetV3(nn.Module):
+    def __init__(self, mode = "large", num_classes = 1000, dropout = 0.2):
+        super(MobileNetV3, self).__init__()
+        self.mode = mode
+        if mode == "large":
+            self.cfgs = [
+                # in_channels, expand_ratio, out_channels, kernel_size, strice, se_ratio, activation
+                [16, 16, 16, 3, 1, None, 'relu'],
+                [16, 64, 24, 3, 2, None, 'relu'],
+                [24, 72, 24, 3, 1, None, 'relu'],
+                [24, 72, 40, 5, 2, 4, 'relu'],
+                [40, 120, 40, 5, 1, 4, 'relu'],
+                [40, 120, 40, 5, 1, 4, 'relu'],
+                [40, 240, 80, 3, 2, None, 'hard_swish'],
+                [80, 200, 80, 3, 1, None, 'hard_swish'],
+                [80, 184, 80, 3, 1, None, 'hard_swish'],
+                [80, 184, 80, 3, 1, None, 'hard_swish'],
+                [80, 480, 112, 3, 1, 4, 'hard_swish'],
+                [112, 672, 112, 3, 1, 4, 'hard_swish'],
+                [112, 672, 160, 5, 2, 4, 'hard_swish'],
+                [160, 960, 160, 5, 1, 4, 'hard_swish'],
+                [160, 960, 160, 5, 1, 4, 'hard_swish'],
+            ]
+            
+            in_channels = 16
+            self.first_conv = nn.Sequential(
+                nn.Conv2d(3, in_channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(in_channels),
+                HardSwish(inplace=True),
+            )
+            
+            self.last_conv = nn.Sequential(
+                nn.Conv2d(160, 960, kernel_size=1, bias=False),
+                nn.BatchNorm2d(960),
+                HardSwish(inplace=True)
+            )
+            
+        elif mode == 'small':
+            self.cfgs = [
+                # in_channels, expand_ratio, out_channels, kernel_size, strice, se_ratio, activation
+                [16, 16, 16, 3, 2, 4, "relu"],       
+                [16, 72, 24, 3, 2, None, "relu"],   
+                [24, 88, 24, 3, 1, None, "relu"],    
+                [24, 96, 40, 5, 2, 4, "hard_swish"],       
+                [40, 240, 40, 5, 1, 4, "hard_swish"],      
+                [40, 240, 40, 5, 1, 4, "hard_swish"],      
+                [40, 120, 48, 5, 1, 4, "hard_swish"],    
+                [48, 144, 48, 5, 1, 4, "hard_swish"],     
+                [48, 288, 96, 5, 2, 4, "hard_swish"],      
+                [96, 576, 96, 5, 1, 4, "hard_swish"],      
+                [96, 576, 96, 5, 1, 4, "hard_swish"],      
+            ]
+            
+            input_channel = 16
+            self.first_conv = nn.Sequential(
+                nn.Conv2d(3, input_channel, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(input_channel),
+                HardSwish(inplace=True)
+            )
+            
+            self.last_conv = nn.Sequential(
+                nn.Conv2d(96, 576, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(576),
+                HardSwish(inplace=True)
+            )
+        
+        else:
+            raise ValueError(f"Unsupported mode: {mode}, please use 'large' or 'small'")
+        
+        self.blocks = nn.ModuleList([])
+        for cfg in self.cfgs:
+            in_c = cfg[0]
+            expand_ratio = cfg[1] / in_c
+            out_c = cfg[2]
+            kernel_size = cfg[3]
+            stride = cfg[4]
+            se_ratio = cfg[5]
+            activation = cfg[6]
+            
+            self.blocks.append(
+                InvertedResidual(in_c, out_c, kernel_size, stride, expand_ratio, se_ratio, activation)
+            )
+            
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        last_dim = 960 if mode == "large" else 576
+        self.classifier = nn.Sequential(
+            nn.Linear(last_dim, 1280), 
+            HardSwish(inplace=True),
+            nn.Dropout(p = dropout), 
+            nn.Linear(1280, num_classes)
+        )
+        
+    def forward(self, x):
+        x = self.first_conv(x)
+        for block in self.blocks:
+            x = block(x)
+        x = self.last_conv(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+            
