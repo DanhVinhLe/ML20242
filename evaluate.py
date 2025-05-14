@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 import seaborn as sns
 
-def evaluate_model(model, test_dataloader, batch_size, num_class=10):
+def evaluate_model(model, test_dataloader, num_class=10):
     """
     Evaluate a model on test data with various metrics including top-1 and top-5 error rates
     
