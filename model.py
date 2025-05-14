@@ -47,6 +47,7 @@ class LeNet(nn.Module):
         return x
 # AlexNet Model
 class AlexNet(nn.Module):
+    # input_size = 227
     def __init__(self, num_classes=1000, in_channels = 3):
         super(AlexNet, self).__init__()
         # Các lớp tích chập
@@ -844,7 +845,7 @@ class VisionTransformer(nn.Module):
         )
         
         # Positional Encoding
-        self.position_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.dim))
+        self.position_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.emb_dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, emb_dim))
         
         # Transformer Encoder Layers
@@ -858,7 +859,7 @@ class VisionTransformer(nn.Module):
     def forward(self, x):
         # Patch Embedding
         batch = x.shape[0]
-        x = self.patch_embedding(x)
+        x = self.to_patch_embedding(x)
         cls_tokens = self.cls_token.expand(batch, -1, -1)
         x = torch.cat((cls_tokens, x), dim = 1)
         x += self.position_embedding
