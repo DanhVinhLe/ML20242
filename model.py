@@ -808,6 +808,7 @@ class TransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(emb_dim)
         self.norm2 = nn.LayerNorm(emb_dim)
         self.dropout1 = nn.Dropout(dropout_rate)
+        self.dropout2 = nn.Dropout(dropout_rate)
         self.MLP = nn.Sequential(
             nn.Linear(emb_dim, ratio_dim * emb_dim),
             nn.GELU(),
@@ -816,12 +817,14 @@ class TransformerBlock(nn.Module):
         )
 
     def forward(self, x):
-        norm_out = self.norm1(x)
-        attn_out, _ = self.attention(norm_out, norm_out, norm_out)
+        x_norm = self.norm1(x)
+        x_norm = x_norm.permute(1, 0, 2)
+        attn_out, _ = self.attention(x_norm, x_norm, x_norm)
+        attn_out = attn_out.permute(1, 0, 2)
         x = x + self.dropout1(attn_out)
         norm_out = self.norm2(x)
-        x = x + self.MLP(norm_out)
-        
+        mlp_out = self.MLP(norm_out)
+        x = x + self.dropout2(mlp_out)
         return x
 class VisionTransformer(nn.Module):
     def __init__(self, num_classes=1000, in_channels=3, img_size=224, patch_size=16, 
@@ -847,7 +850,7 @@ class VisionTransformer(nn.Module):
         # Positional Encoding
         self.position_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.emb_dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, emb_dim))
-        
+        self.dropout = nn.Dropout(dropout_rate)
         # Transformer Encoder Layers
         self.transformer_layers = nn.ModuleList([
             TransformerBlock(emb_dim, num_heads, ratio_dim, dropout_rate) for _ in range(num_layers)
@@ -863,7 +866,7 @@ class VisionTransformer(nn.Module):
         cls_tokens = self.cls_token.expand(batch, -1, -1)
         x = torch.cat((cls_tokens, x), dim = 1)
         x += self.position_embedding
-        x = nn.Dropout(self.dropout_rate)(x)
+        x = self.dropout(x)
         
         for layer in self.transformer_layers:
             x = layer(x)
