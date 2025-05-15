@@ -826,7 +826,25 @@ class TransformerBlock(nn.Module):
         mlp_out = self.MLP(norm_out)
         x = x + self.dropout2(mlp_out)
         return x
+    
+class PatchEmbedding(nn.Module):
+    def __init__(self, img_size =224, patch_size = 16, in_channels = 3, emb_dim = 768):
+        super(PatchEmbedding, self).__init__()
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.in_channels = in_channels
+        self.emb_dim = emb_dim
+        self.num_patches = (img_size // patch_size) ** 2
+        self.proj = nn.Conv2d(in_channels, emb_dim, kernel_size= patch_size, stride = patch_size)
+        
+    def forward(self, x):
+        B, C, H, W = x.shape
+        x = self.proj(x)
+        x = x.flatten(2) # (B, emb_dim, num_patches)
+        x = x.transpose(1, 2) # (B, num_patches, emb_dim)
+        return x
 class VisionTransformer(nn.Module):
+    
     def __init__(self, num_classes=1000, in_channels=3, img_size=224, patch_size=16, 
                  emb_dim=768, num_layers=12, num_heads=12, ratio_dim = 4, dropout_rate=0.1):
         super(VisionTransformer, self).__init__()
@@ -841,11 +859,11 @@ class VisionTransformer(nn.Module):
         self.dropout_rate = dropout_rate
         
         # Patch Embedding
-        num_patches = (img_size // patch_size) ** 2
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size),
-            nn.Linear(patch_size * patch_size * in_channels, emb_dim)
-        )
+        self.patch_embed = PatchEmbedding(img_size = self.img_size, 
+                                          patch_size= self.patch_size,
+                                          in_channels= self.in_channels,
+                                          emb_dim= self.emb_dim)
+        num_patches = self.patch_embed.num_patches
         
         # Positional Encoding
         self.position_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.emb_dim))
@@ -862,7 +880,7 @@ class VisionTransformer(nn.Module):
     def forward(self, x):
         # Patch Embedding
         batch = x.shape[0]
-        x = self.to_patch_embedding(x)
+        x = self.patch_embed(x)
         cls_tokens = self.cls_token.expand(batch, -1, -1)
         x = torch.cat((cls_tokens, x), dim = 1)
         x += self.position_embedding
