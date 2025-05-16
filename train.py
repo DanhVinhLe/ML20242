@@ -27,7 +27,8 @@ from evaluate import evaluate_model
 
 def parse_args(input_args = None):
     parser = argparse.ArgumentParser(description="Example training script")
-    parser.add_argument('--data_dir', type=str, default='data', help='Path to the dataset directory')
+    parser.add_argument('--train_dir', type = str, required= True, help = 'Path to the training data directory')
+    parser.add_argument('--test_dir', type = str, required= True, help = 'Path to the testing data directory')
     parser.add_argument('--input_size', type=int, default=224, help='Input size for the model')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training and validation')
     parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs to train')
@@ -55,7 +56,7 @@ def main(args):
     else:
         device = torch.device("cpu")
     print(f"Using device: {device}")
-    dataloaders, dataset_sizes, class_names, num_classes = prepare_data(args.data_dir, args.input_size, args.batch_size)
+    dataloaders, dataset_sizes, class_names, num_classes = prepare_data(train_dir= args.train_dir, test_dir= args.test_dir, input_size= args.input_size, batch_size= args.batch_size)
     print(f"Dataset sizes: {dataset_sizes}")
     print(f"Class names: {class_names}")
     
