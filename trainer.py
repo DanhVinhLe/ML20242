@@ -68,7 +68,6 @@ class Trainer:
                         else:
                             loss = self.criterion(outputs, labels)
                             _, preds = torch.max(outputs, 1)
-                        loss = self.criterion(outputs, labels)
                         
                         if phase == 'train':
                             loss.backward()
