@@ -724,7 +724,7 @@ class AuxiliaryClassifier(nn.Module):
 InceptionOutput = namedtuple('InceptionOutput', ['logits', 'aux_logits'])
 
 class InceptionV3(nn.Module):
-    def __init__(self, num_classes = 1000, in_channels = 3, aux_logits = False):
+    def __init__(self, num_classes = 1000, in_channels = 3, aux_logits = True):
         super().__init__()
         self.aux_logits = aux_logits
         self.num_classes = num_classes
@@ -785,7 +785,8 @@ class InceptionV3(nn.Module):
         # print(x.shape)
         
         if self.aux_logits:
-            aux = self.aux_classifier(x)
+            input_aux = x
+            aux = self.aux_classifier(input_aux)
         
         x = self.mixed_7a(x)
         x = self.mixed_7b(x)

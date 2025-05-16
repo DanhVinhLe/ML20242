@@ -59,7 +59,15 @@ class Trainer:
                     
                     with torch.set_grad_enabled(phase == 'train'):
                         outputs = self.model(inputs)
-                        _, preds = torch.max(outputs, 1)
+                        if isinstance(outputs, tuple) and len(outputs) == 2:
+                            main_output, aux_output = outputs
+                            main_loss = self.criterion(main_output, labels)
+                            aux_loss = self.criterion(aux_output, labels)
+                            loss = main_loss + 0.4 * aux_loss
+                            _, preds = torch.max(main_output, 1)
+                        else:
+                            loss = self.criterion(outputs, labels)
+                            _, preds = torch.max(outputs, 1)
                         loss = self.criterion(outputs, labels)
                         
                         if phase == 'train':
