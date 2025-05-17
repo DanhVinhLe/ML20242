@@ -69,7 +69,7 @@ def main(args):
     print(f"Class names: {class_names}")
     
     if args.model_name == 'linearsvm_mnist':
-        model = LinearSVM(input_dim=784, num_classes=num_classes)
+        model = LinearSVM(input_size=args.input_size, num_classes=num_classes)
     if args.model_name == 'alexnet':
         model = AlexNet(num_classes=num_classes)
     elif args.model_name == 'lenet':
