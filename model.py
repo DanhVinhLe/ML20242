@@ -13,7 +13,15 @@ from collections import namedtuple
 import einops
 from einops.layers.torch import Rearrange
 
+class LinearSVM(nn.Module):
+    def __init__(self, input_size = 28, num_classes = 10):
+        super().__init__()
+        self.linear = nn.Linear(input_size*input_size, num_classes)
 
+    def forward(self, x):
+        x = torch.flatten(x, start_dim=1)
+        scores = self.linear(x) 
+        return scores
 #Lenet Model
 class LeNet(nn.Module):
     def __init__(self, num_classes = 10, in_channels = 1):
@@ -21,7 +29,7 @@ class LeNet(nn.Module):
         # Các lớp tích chập
         self.in_channels = in_channels
         self.num_classes = num_classes 
-        self.conv1 = nn.Conv2d(self.in_channels, 6, kernel_size=5)
+        self.conv1 = nn.Conv2d(self.in_channels, 6, kernel_size=5,padding=2)
         self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)

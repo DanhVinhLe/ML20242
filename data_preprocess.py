@@ -64,3 +64,44 @@ def prepare_data(train_dir,test_dir, input_size, batch_size):
     print("Test set size:", dataset_sizes['test'])
     
     return dataloaders, dataset_sizes, class_names, num_classes
+
+def prepare_mnist_data(data_dir, batch_size):
+    """
+    Prepare data loaders for MNIST dataset for LinearSVM.
+    Images will be flattened.
+    
+    Args:
+        data_dir: Directory to download/load MNIST data
+        batch_size: Batch size for dataloaders
+        
+    Returns:
+        tuple: (dataloaders, dataset_sizes, class_names, num_classes)
+    """
+    mnist_transforms = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)), 
+    ])
+    
+    train_dataset = datasets.MNIST(root=data_dir, train=True, download=True, transform=mnist_transforms)
+    test_dataset = datasets.MNIST(root=data_dir, train=False, download=True, transform=mnist_transforms)
+    
+    dataloaders = {
+        'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=True),
+        'test': DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    }
+    
+    dataset_sizes = {
+        'train': len(train_dataset),
+        'test': len(test_dataset)
+    }
+    
+    # MNIST class names are digits 0-9
+    class_names = [str(i) for i in range(10)]
+    num_classes = 10
+    
+    print("MNIST Data Prepared:")
+    print("Number of classes:", num_classes)
+    print("Train set size:", dataset_sizes['train'])
+    print("Test set size:", dataset_sizes['test'])
+    
+    return dataloaders, dataset_sizes, class_names, num_classes

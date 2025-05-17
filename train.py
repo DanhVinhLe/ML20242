@@ -1,6 +1,6 @@
 from evaluate import evaluate_model
 from trainer import Trainer, count_images_per_class, calculate_class_weights
-from data_preprocess import prepare_data
+from data_preprocess import prepare_data,prepare_mnist_data
 from model import *
 import torch
 import torch.nn as nn
@@ -27,18 +27,19 @@ from evaluate import evaluate_model
 
 def parse_args(input_args = None):
     parser = argparse.ArgumentParser(description="Example training script")
-    parser.add_argument('--train_dir', type = str, required= True, help = 'Path to the training data directory')
-    parser.add_argument('--test_dir', type = str, required= True, help = 'Path to the testing data directory')
+    parser.add_argument('--train_dir', type = str, help = 'Path to the training data directory')
+    parser.add_argument('--test_dir', type = str, help = 'Path to the testing data directory')
+    parser.add_argument('--mnist_data_dir', type=str, default='./data', help='Directory to store MNIST data')    
     parser.add_argument('--input_size', type=int, default=224, help='Input size for the model')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training and validation')
     parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs to train')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for the optimizer')
     parser.add_argument('--model_name', type = str, default = 'alexnet',
-                        choices = ['alexnet', 'vgg16', 'lenet', 'vgg16', 'vgg16_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'inceptionv3', 'mobilenetv3', 'vit'],
+                        choices = ['linearsvm_mnist','alexnet', 'vgg16', 'lenet', 'vgg16', 'vgg16_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'inceptionv3', 'mobilenetv3', 'vit'],
                         help = 'Name of the model to use')
     parser.add_argument('--pretrained', action='store_true', help='Use pretrained model weights')
     parser.add_argument('--save_path', type=str, default='best_model.pth', help='Path to save the best model')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', choices=['cross_entropy', 'mse'], help='Loss function to use')
+    parser.add_argument('--criterion', type=str, default='cross_entropy', choices=['cross_entropy', 'mse','hinge'], help='Loss function to use')
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'adamw', 'sgd'], help='Optimizer to use')
     parser.add_argument('--scheduler', type=str, default='constant', choices=['constant', 'linear', 'cosine'], help='Learning rate scheduler to use')
     parser.add_argument('--num_warmup_steps', type=int, default=0, help='Number of warmup steps for the scheduler')
@@ -58,14 +59,21 @@ def main(args):
     else:
         device = torch.device("cpu")
     print(f"Using device: {device}")
-    dataloaders, dataset_sizes, class_names, num_classes = prepare_data(train_dir= args.train_dir, test_dir= args.test_dir, input_size= args.input_size, batch_size= args.batch_size)
+    if args.model_name == 'linearsvm_mnist':
+        dataloaders, dataset_sizes, class_names, num_classes = prepare_mnist_data(data_dir=args.mnist_data_dir, batch_size=args.batch_size)
+    else:
+        if not args.train_dir or not args.test_dir:
+            raise ValueError("train_dir and test_dir must be specified for models other than linearsvm_mnist")
+        dataloaders, dataset_sizes, class_names, num_classes = prepare_data(train_dir= args.train_dir, test_dir= args.test_dir, input_size= args.input_size, batch_size= args.batch_size)
     print(f"Dataset sizes: {dataset_sizes}")
     print(f"Class names: {class_names}")
     
+    if args.model_name == 'linearsvm_mnist':
+        model = LinearSVM(input_dim=784, num_classes=num_classes)
     if args.model_name == 'alexnet':
         model = AlexNet(num_classes=num_classes)
     elif args.model_name == 'lenet':
-        model = LeNet(num_classes=num_classes, in_channels=3)
+        model = LeNet(num_classes=num_classes, in_channels=1)
     elif args.model_name == 'vgg16':
         model = VGG16(num_classes = num_classes, in_channels = 3, dropout_rate= 0.4, input_size=args.input_size)
     elif args.model_name == 'vgg16_bn':
@@ -103,7 +111,13 @@ def main(args):
             criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
         else:
             criterion = nn.CrossEntropyLoss()
-            
+    elif args.criterion == "hinge":
+        criterion = nn.MultiMarginLoss()      
+    elif args.criterion == 'mse':
+        criterion = nn.MSELoss()
+    else:
+        raise ValueError(f"Criterion {args.criterion} not recognized.")
+        
     if args.scheduler == 'constant':
         scheduler = None
     elif args.scheduler == 'linear':
