@@ -10,6 +10,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
+def count_images_per_class(dataloader):
+    class_counts = {}
+    
+    class_to_idx = dataloader.dataset.class_to_idx
+    idx_to_class = {v: k for k, v in class_to_idx.items()}
+    for class_name, idx in class_to_idx.items():
+        class_counts[idx] = 0
+    for _, labels in tqdm(dataloader, desc = "Counting images per class"):
+        for label in labels:
+            class_idx = label.item()
+            class_counts[class_idx] += 1
+    return class_counts
+
+def calculate_class_weights(class_counts, weight_type = 'inverse'):
+    counts = []
+    class_indices = []
+    for class_idx, count in class_counts.items():
+        counts.append(count)
+        class_indices.append(class_idx)
+    
+    sorted_indices = sorted(zip(class_indices, counts))
+    class_indices = [pair[0] for pair in sorted_indices]
+    counts = [pair[1] for pair in sorted_indices]
+    counts = np.array(counts)
+    if weight_type == 'inverse':
+        weights = 1.0 / counts
+    elif weight_type == 'sqrt_inverse':
+        weights = 1.0 / np.sqrt(counts)
+    else:
+        raise ValueError("Invalid weight type. Choose 'inverse' or 'sqrt_inverse'.")
+    weights = weights / np.sum(weights) * len(class_counts)
+    class_weights = torch.tensor(weights, dtype=torch.float)
+    return class_weights
+    
 
 class Trainer:
     def __init__(self, model, dataloaders, dataset_sizes, criterion, optimizer, scheduler = None, 

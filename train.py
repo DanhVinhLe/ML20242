@@ -1,5 +1,5 @@
 from evaluate import evaluate_model
-from trainer import Trainer
+from trainer import Trainer, count_images_per_class, calculate_class_weights
 from data_preprocess import prepare_data
 from model import *
 import torch
@@ -44,6 +44,8 @@ def parse_args(input_args = None):
     parser.add_argument('--num_warmup_steps', type=int, default=0, help='Number of warmup steps for the scheduler')
     parser.add_argument('--model_type', type = str, default = 'large', choices = ['large', 'small'], help = 'Model type of MobileNetV3')
     parser.add_argument('--dropout_rate', type = float, default = 0.4, help = 'Dropout rate for model')
+    parser.add_argument('--use_class_weights', action='store_true', help='Use class weights for loss function')
+    parser.add_argument('--weight_type', type=str, default='inverse', choices=['inverse', 'sqrt_inverse'], help='Type of class weights to use')
     args = parser.parse_args(input_args)
     return args
 
@@ -95,7 +97,13 @@ def main(args):
         raise ValueError(f"Optimizer {args.optimizer} not recognized.")
     
     if args.criterion == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss()
+        if args.use_class_weights:
+            class_counts = count_images_per_class(dataloaders['train'])
+            class_weights = calculate_class_weights(class_counts, weight_type=args.weight_type)
+            criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+        else:
+            criterion = nn.CrossEntropyLoss()
+            
     if args.scheduler == 'constant':
         scheduler = None
     elif args.scheduler == 'linear':
