@@ -120,11 +120,16 @@ def main(args):
         
     if args.scheduler == 'constant':
         scheduler = None
-    elif args.scheduler == 'linear':
-        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=args.num_warmup_steps)
-    elif args.scheduler == 'cosine':
-        scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs, eta_min=0)
+    else:
+        warmup_steps = args.num_warmup_steps
+        total_steps = args.num_epochs * len(dataloaders['train'])
+        warmup_scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_steps)
+        if args.scheduler == 'linear':
+            decay_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.05, total_iters=total_steps - warmup_steps)
+        elif args.scheduler == 'cosine':
+            decay_scheduler = CosineAnnealingLR(optimizer, T_max=total_steps - warmup_steps, eta_min=0.1 * args.learning_rate) 
         
+        scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_steps])    
     
     trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=criterion, optimizer=optimizer, scheduler=scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
     model, history = trainer.train()
