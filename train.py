@@ -29,7 +29,7 @@ def parse_args(input_args = None):
     parser = argparse.ArgumentParser(description="Example training script")
     parser.add_argument('--train_dir', type = str, help = 'Path to the training data directory')
     parser.add_argument('--test_dir', type = str, help = 'Path to the testing data directory')
-    parser.add_argument('--mnist_data_dir', type=str, default='./data', help='Directory to store MNIST data')    
+    parser.add_argument('--mnist_data_dir', type=str, default=None, help='Directory to store MNIST data')    
     parser.add_argument('--input_size', type=int, default=224, help='Input size for the model')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training and validation')
     parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs to train')
@@ -59,7 +59,7 @@ def main(args):
     else:
         device = torch.device("cpu")
     print(f"Using device: {device}")
-    if args.model_name == 'linearsvm_mnist':
+    if args.mnist_data_dir is not None:
         dataloaders, dataset_sizes, class_names, num_classes = prepare_mnist_data(data_dir=args.mnist_data_dir, batch_size=args.batch_size)
     else:
         if not args.train_dir or not args.test_dir:
@@ -70,7 +70,7 @@ def main(args):
     
     if args.model_name == 'linearsvm_mnist':
         model = LinearSVM(input_size=args.input_size, num_classes=num_classes)
-    if args.model_name == 'alexnet':
+    elif args.model_name == 'alexnet':
         model = AlexNet(num_classes=num_classes)
     elif args.model_name == 'lenet':
         model = LeNet(num_classes=num_classes, in_channels=1)
