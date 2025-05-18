@@ -22,7 +22,7 @@ import json
 import logging
 import sys
 import warnings
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR, LambdaLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR, ConstantLR
 from evaluate import evaluate_model
 
 def parse_args(input_args = None):
@@ -123,13 +123,38 @@ def main(args):
     else:
         warmup_steps = args.num_warmup_steps
         total_steps = args.num_epochs * len(dataloaders['train'])
-        warmup_scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_steps)
+        decay_steps = int(0.05 * total_steps) 
+        steady_steps = total_steps - warmup_steps - decay_steps
+
+        warmup_scheduler = LinearLR(
+            optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_steps
+        )
+        steady_scheduler = ConstantLR(
+            optimizer, factor=1.0, total_iters=steady_steps
+        )
+
         if args.scheduler == 'linear':
-            decay_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.05, total_iters=total_steps - warmup_steps)
+            decay_scheduler = LinearLR(
+                optimizer,
+                start_factor=1.0,
+                end_factor=0.05,
+                total_iters=decay_steps
+            )
         elif args.scheduler == 'cosine':
-            decay_scheduler = CosineAnnealingLR(optimizer, T_max=total_steps - warmup_steps, eta_min=0.1 * args.learning_rate) 
-        
-        scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_steps])    
+            eta_min = 0.1 * args.learning_rate
+            decay_scheduler = CosineAnnealingLR(
+                optimizer,
+                T_max=decay_steps,
+                eta_min=eta_min
+            )
+        else:
+            raise ValueError(f"Unknown scheduler type: {args.scheduler}")
+
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, steady_scheduler, decay_scheduler],
+            milestones=[warmup_steps, warmup_steps + steady_steps]
+        )   
     
     trainer = Trainer(model, dataloaders= dataloaders, dataset_sizes=dataset_sizes, criterion=criterion, optimizer=optimizer, scheduler=scheduler, device=device, num_epochs=args.num_epochs, save_path=args.save_path)
     model, history = trainer.train()
