@@ -68,7 +68,7 @@ Tương tự, các lớp tích chập cũng có thể tạo ra nhiều kênh đ�
 
 Trong phép toán tương quan chéo hai chiều, chúng ta bắt đầu với cửa sổ tích chập được đặt ở góc trên bên trái của tensor đầu vào và trượt nó trên tensor đầu vào, cả từ trái sang phải và từ trên xuống dưới. Khi cửa sổ tích chập trượt đến một vị trí nhất định, các phần tử của subtensor đầu vào nằm trong cửa sổ đó và các phần tử của tensor kernel được nhân tương ứng theo từng vị trí, và tensor kết quả được cộng lại để tạo ra một giá trị vô hướng duy nhất. Giá trị này trở thành giá trị của tensor đầu ra tại vị trí tương ứng.
 
-![ảnh minh hoạ](image-1-2-1.png)
+![alt text](image-1-2-1.png)
 
 Dọc theo mỗi trục, kích thước đầu ra nhỏ hơn một chút so với kích thước đầu vào. Vì kernel có chiều rộng và chiều cao lớn hơn 1, chúng ta chỉ có thể tính toán chính xác phép tương quan chéo cho các vị trí mà kernel nằm hoàn toàn trong ảnh. Kích thước đầu ra được xác định bởi kích thước đầu vào $n_h \times n_w$ trừ đi kích thước của kernel tích chập $k_h \times k_w$ theo công thức:
 $$(n_h-k_h+1)\times(n_w-k_w+1)$$
