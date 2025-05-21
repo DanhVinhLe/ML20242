@@ -155,8 +155,9 @@ class VGG16(nn.Module):
         )
         self.input_size = input_size
         self.feature_size = self.input_size // 32
+        self.avg_pool = nn.AdaptiveAvgPool2d((7, 7))
         
-        self.fc1 = nn.Linear(512 * self.feature_size * self.feature_size, 4096)
+        self.fc1 = nn.Linear(512 * 7 * 7, 4096)
         self.dropout1 = nn.Dropout(p = dropout_rate)
         self.fc2 = nn.Linear(4096, 4096)
         self.dropout2 = nn.Dropout(p = dropout_rate)
@@ -168,6 +169,7 @@ class VGG16(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.layer5(x)
+        x = self.avg_pool(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
         x = F.relu(x)
@@ -243,7 +245,7 @@ class VGG16BatchNorm(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.feature_size = self.input_size // 32
-        
+        self.avg_pool = nn.AdaptiveAvgPool2d((7, 7))
         self.fc1 = nn.Linear(512 * self.feature_size * self.feature_size, 4096)
         self.dropout1 = nn.Dropout(p=dropout_rate)
         self.fc2 = nn.Linear(4096, 4096)
@@ -255,6 +257,7 @@ class VGG16BatchNorm(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.layer5(x)
+        x = self.avg_pool(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
         x = F.relu(x)
