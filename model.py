@@ -162,6 +162,7 @@ class VGG16(nn.Module):
         self.fc2 = nn.Linear(4096, 4096)
         self.dropout2 = nn.Dropout(p = dropout_rate)
         self.fc3 = nn.Linear(4096, self.num_classes)
+        self._initialize_weights()
     
     def forward(self, x):
         x = self.layer1(x)
@@ -179,7 +180,16 @@ class VGG16(nn.Module):
         x = self.dropout2(x)
         x = self.fc3(x)
         return x
-
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, np.sqrt(2. / n))
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                m.weight.data.normal_(0, 0.01)
+                m.bias.data.zero_()
 class VGG16BatchNorm(nn.Module):
     def __init__(self, num_classes=1000, in_channels = 3, dropout_rate=0.5, input_size = 227):
         super(VGG16BatchNorm, self).__init__()
