@@ -43,7 +43,7 @@ python train.py \
     --dropout_rate=0.4 
 ```
 
-Để tìm hiểu nhiều hơn về các tham số phục vụ cho việc đào tạo, xem trong file [train.py](train.py)
+Để tìm hiểu nhiều hơn về các tham số phục vụ cho việc training model, xem trong file [train.py](train.py), hoặc có thể chạy theo mẫu trong [notebook](example/train_vgg16.ipynb)
 
 - Thực hiện train mô hình với tập dữ liệu **MNIST** 
 Chạy với scripts đơn giảngiản
@@ -56,7 +56,18 @@ python train.py \
     --batch_size=64 \
     --input_size=28 
 ```
-Để tìm hiểu nhiều hơn về các tham số phục vụ cho việc đào tạo, xem trong file [train.py](train.py), hoặc có thể chạy theo mẫu trong [file notebook](train_mnist_SVN_LeNet.ipynb)
+Để tìm hiểu nhiều hơn về các tham số phục vụ cho việc training model, xem trong file [train.py](train.py), hoặc có thể chạy theo mẫu trong [file notebook](example/train_mnist_SVM_LeNet.ipynb)
 
-## Evaluate Model
-TODO!
+## Demo
+Để thực hiện chạy Demo các mô hình đã được train, thực hiện chạy lệnh 
+```bash
+python demo.py
+```
+Khi đó, nhấp vào link của **gradio** để thực hiện chạy thử, với giao diện
+![alt text](image.png)
+
+**Lưu ý:**
+- Các phiên bản **weight** hiện chỉ tương thích với **config** của mô hình được **pretrained** từ **torchvision**. 
+- Cần chọn đúng task phân loại ứng với đúng.
+- Cần đặt tên **weight** theo đúng tên mô hình và phải được chứa trong folder ứng với tên của task phân loại sử dụng (Ví dụ sử dụng mô hình ResNet18, thì cần đặt tên **weight** là `ResNet18.pth` và được chứa trong folder `intel` nếu sử dụng cho **Intel Image Classification** hoặc folder `mit` nếu sử dụng cho **MIT Indoor Scenes**)
+- Thông tin chi tiết được thể hiện ở phần `Thông tin chi tiết` của giao diện `demo`. 
