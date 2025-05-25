@@ -68,7 +68,9 @@ Tương tự, các lớp tích chập cũng có thể tạo ra nhiều kênh đ�
 
 Trong phép toán tương quan chéo hai chiều, chúng ta bắt đầu với cửa sổ tích chập được đặt ở góc trên bên trái của tensor đầu vào và trượt nó trên tensor đầu vào, cả từ trái sang phải và từ trên xuống dưới. Khi cửa sổ tích chập trượt đến một vị trí nhất định, các phần tử của subtensor đầu vào nằm trong cửa sổ đó và các phần tử của tensor kernel được nhân tương ứng theo từng vị trí, và tensor kết quả được cộng lại để tạo ra một giá trị vô hướng duy nhất. Giá trị này trở thành giá trị của tensor đầu ra tại vị trí tương ứng.
 
-![alt text](image-1-2-1.png)
+<p align="center">
+  <img src="image-1-2-1.png" alt="alt text" />
+</p>
 
 Dọc theo mỗi trục, kích thước đầu ra nhỏ hơn một chút so với kích thước đầu vào. Vì kernel có chiều rộng và chiều cao lớn hơn 1, chúng ta chỉ có thể tính toán chính xác phép tương quan chéo cho các vị trí mà kernel nằm hoàn toàn trong ảnh. Kích thước đầu ra được xác định bởi kích thước đầu vào $n_h \times n_w$ trừ đi kích thước của kernel tích chập $k_h \times k_w$ theo công thức:
 $$(n_h-k_h+1)\times(n_w-k_w+1)$$
@@ -445,4 +447,110 @@ Cuối cùng, giống như GoogLeNet, ResNet thêm một tầng gộp trung bìn
 
 ResNet cho phép huấn luyện các mạng rất sâu (lên đến 152 lớp trong bài báo gốc) nhờ các kết nối residual giúp gradient lan truyền hiệu quả hơn.
 
-## III. 
+## III. Optimization Technique
+
+Việc cập nhật tham số của mạng trong quá trình train ảnh hường rất lớn đến chi phí cũng như độ chính xác của mạng.  
+
+Bản chất đây chính là bước tìm nghiệm tối ưu cho bài toán cực tiểu của hàm loss. Một cách tự nhiên, chúng ta sẽ nghĩ ngay đến phương pháp lấy đạo hàm rồi giải phương trình tìm nghiệm tối ưu. Tuy nhiên trong thực tế, để làm được điều đó là rất phức tạp hoặc có thể xem là bất khả thi. Do đó, nhiều thuật toán tối ưu đã được xây dựng để khắc phục điều đó.
+
+#### III.1 Gradient descent:
+Đây là thuật toán có thể coi là kinh điển trong tối ưu. Về cơ bản thuật toán được thiết kế để cực tiểu hóa hàm số bằng cách liên tục tìm các nghiệm làm giảm hàm số đó. 
+
+Gọi $f(x)$ là hàm mục tiêu. Ở tại mỗi bước, ta sẽ cập nhật $x_{t+1} = x_t - \eta \nabla_{x}f(x)$
+
+Một só biến thể của gradient descent bao gồm: 
+- Stochastic Gradient Descent (SGD): Thay vì tính gradient cho toàn bộ example và lấy trung bình thì ta chỉ lấy 1 example và cập nhật luôn. Mục đích là để giảm chi phí khi lượng data là quá lớn.
+- Mini-batch Gradient Descent (MGD): Ta không lấy toàn bộ mà chỉ lấy mốt số examples (batch) để thực hiện gradient descent.
+- GD with momentum: Có thể hiểu rằng momentum sẽ thêm tốc độ trước đó vào hàm cập nhật gradient nhằm giúp thuật toán hội tụ nhanh hơn
+$$v_t = \gamma v_{t-1} + \eta \nabla_{x}f(x) \\
+x = x - v_t$$
+Thông thương $\gamma = 0.9$
+![alt text](sgd_momentum.png)
+
+#### III.2. Adagrad (Adaptive Gradient Algorithm)
+Adagrad tự động điều chỉnh tốc độ học (learning rate) cho từng tham số dựa trên lịch sử gradient của chính tham số đó. Các tham số có gradient lớn sẽ có learning rate giảm dần, trong khi các tham số ít cập nhật sẽ có learning rate lớn hơn.
+
+Công thức cập nhật:
+Với mỗi tham số $w_i$, Adagrad duy trì tổng bình phương các gradient trước đó: $$ G_{t,i} = G_{t-1,i} + [\nabla_{w_i} f(w)]^2 $$ Tham số được cập nhật như sau: $$ w_{t+1,i} = w_{t,i} - \frac{\eta}{\sqrt{G_{t,i}} + \epsilon} \nabla_{w_i} f(w) $$ Trong đó:
+
+$\eta$ là learning rate ban đầu,
+$\epsilon$ là hằng số nhỏ để tránh chia cho 0.
+
+Ưu điểm:
+
+- Phù hợp với dữ liệu thưa (sparse data), ví dụ như xử lý ngôn ngữ tự nhiên.
+- Không cần điều chỉnh learning rate thủ công cho từng tham 
+số.
+
+Nhược điểm:
+
+- Learning rate giảm dần và có thể trở nên rất nhỏ sau nhiều bước, khiến thuật toán dừng lại sớm trước khi đạt cực tiểu toàn cục.
+
+RMSprop điều chỉnh learning rate cho từng tham số dựa trên giá trị trung bình động (moving average) của bình phương gradient gần đây, thay vì cộng dồn toàn bộ như Adagrad. Điều này giúp learning rate không bị giảm quá nhanh và giữ cho quá trình học ổn định hơn.
+
+Công thức cập nhật:
+Với mỗi tham số $w_i$: $$ E[g^2]_t = \gamma E[g^2]_{t-1} + (1 - \gamma)[\nabla_{w_i} f(w)]^2 $$ $$ w_{t+1,i} = w_{t,i} - \frac{\eta}{\sqrt{E[g^2]_t} + \epsilon} \nabla_{w_i} f(w) $$ Trong đó:
+
+$E[g^2]_t$ là giá trị trung bình động của bình phương gradient,
+
+$\gamma$ là hệ số làm mượt (thường khoảng 0.9),
+$\eta$ là learning rate,
+$\epsilon$ là hằng số nhỏ để tránh chia cho 0.
+
+Ưu điểm:
+
+- Giữ cho learning rate ổn định, không bị giảm quá nhanh như Adagrad.
+Hiệu quả với các bài toán deep learning thực tế, đặc biệt là RNN.
+
+Nhược điểm:
+
+- Cần điều chỉnh siêu tham số $\gamma$ và learning rate $\eta$.
+
+#### III.3. Adam (Adaptive Moment Estimation)
+Adam là một thuật toán tối ưu hóa hiện đại, kết hợp ưu điểm của cả Momentum và RMSprop để điều chỉnh learning rate cho từng tham số một cách thích nghi và hiệu quả.
+
+**Ý tưởng chính:**
+Adam sử dụng cả trung bình động của gradient (momentum) và trung bình động của bình phương gradient (RMSprop) để điều chỉnh learning rate cho từng tham số. Điều này giúp quá trình tối ưu hóa ổn định, hội tụ nhanh và hiệu quả trên nhiều bài toán thực tế.
+
+**Công thức cập nhật:**
+Với mỗi tham số $w_i$ tại bước $t$:
+- Tính trung bình động bậc nhất (momentum):
+$$
+m_t = \beta_1 m_{t-1} + (1 - \beta_1) \nabla_{w_i} f(w)
+$$
+- Tính trung bình động bậc hai (RMSprop):
+$$
+v_t = \beta_2 v_{t-1} + (1 - \beta_2) [\nabla_{w_i} f(w)]^2
+$$
+- Hiệu chỉnh bias:
+$$
+\hat{m}_t = \frac{m_t}{1 - \beta_1^t}
+$$
+$$
+\hat{v}_t = \frac{v_t}{1 - \beta_2^t}
+$$
+- Cập nhật tham số:
+$$
+w_{t+1,i} = w_{t,i} - \frac{\eta}{\sqrt{\hat{v}_t} + \epsilon} \hat{m}_t
+$$
+Trong đó:
+- $\eta$ là learning rate,
+- $\beta_1$ (thường 0.9) là hệ số momentum,
+- $\beta_2$ (thường 0.999) là hệ số RMSprop,
+- $\epsilon$ là hằng số nhỏ để tránh chia cho 0.
+
+**Ưu điểm:**
+- Hội tụ nhanh, ổn định trên nhiều bài toán deep learning thực tế.
+- Không cần điều chỉnh learning rate thủ công nhiều.
+- Phù hợp với dữ liệu lớn và các mô hình phức tạp.
+
+**Nhược điểm:**
+- Có thể hội tụ đến nghiệm không tối ưu toàn cục trong một số trường hợp.
+- Cần điều chỉnh các siêu tham số $\beta_1$, $\beta_2$, $\eta$ cho phù hợp với từng bài toán.
+
+#### Tổng kết:
+<p align="center">
+  <img src="optimizers.png" alt="alt text" />
+</p>
+
+Ở đây $g_t = \nabla f(\theta_t)$
