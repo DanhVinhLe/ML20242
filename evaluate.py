@@ -75,6 +75,7 @@ def evaluate_model(model, test_dataloader, num_class=10):
     print(f'Evaluation Results:')
     print(f'Top-1 Accuracy: {top1_accuracy:.2f}%')
     print(f'Top-1 Error: {top1_error:.2f}%')
+    print(f'Evaluate successfull')
     
     if num_class > 5:
         print(f'Top-5 Accuracy: {top5_accuracy:.2f}%')
